@@ -1,0 +1,328 @@
+---
+title: "Glut2 neurons analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+
+```{r global settings}
+knitr::opts_chunk$set(message = FALSE,echo=FALSE,warning=FALSE)
+library(Seurat)
+library(dplyr)
+# conversion from ENSEMBL to gene names requires a AnnotationDbi dataset
+library(org.Mm.eg.db)
+library(sctransform)
+library(ggplot2)
+library(ggfittext)
+library(tidyverse)
+library(kableExtra)
+
+```
+
+```{r neuron, include=FALSE}
+
+# first, subset neurons and recluster
+dvcNeurons_glut2 <- read_rds("DVC_glut2_neuron.rds")
+
+
+# DefaultAssay(newDVC) <- "integrated"
+# dvcNeurons <- subset (newDVC,idents = "Neurons")
+# # DimPlot(dvcNeurons)
+# dvcNeurons <- FindVariableFeatures (dvcNeurons)
+# dvcNeurons <- ScaleData(dvcNeurons, verbose = FALSE)
+# dvcNeurons <- RunPCA(dvcNeurons, npcs = 30, verbose = FALSE)
+# # ElbowPlot(dvcNeurons)
+# dvcNeurons<-FindNeighbors(object = dvcNeurons, reduction = "pca",dims=1:30)
+# dvcNeurons<-FindClusters(dvcNeurons,resolution = 0.3)
+# dvcNeurons <- RunUMAP(dvcNeurons, reduction = "pca", dims = 1:30)
+# 
+# 
+# DefaultAssay(dvcNeurons) <- "RNA"
+# dvcNeurons_glut2 <- subset(dvcNeurons, Slc2a2>0, slot="counts")
+# DefaultAssay(dvcNeurons_glut2) <- "integrated"
+# dvcNeurons_glut2 <- SCTransform(dvcNeurons_glut2 )
+# dvcNeurons_glut2 <- RunPCA(dvcNeurons_glut2, verbose = FALSE)
+# dvcNeurons_glut2 <- RunUMAP(dvcNeurons_glut2, dims = 1:30,verbose=F)
+# dvcNeurons_glut2<-FindNeighbors(object = dvcNeurons_glut2,dims=1:30,assay="SCT")
+```
+
+
+
+
+```{r  Glut2 neurons more }
+DefaultAssay(dvcNeurons_glut2) <- 'SCT'
+dvcNeurons_glut2<-FindClusters(dvcNeurons_glut2,resolution = 1.3,verbose=F)
+DimPlot(dvcNeurons_glut2,label=T,repel=T,size=3.5)+ggmin::theme_powerpoint()+NoLegend()+labs(title="Clusters of Glut2+ neurons, n=249 (out of 49391)")+theme(plot.title = element_text(face="bold"))
+DefaultAssay(dvcNeurons_glut2) <- 'RNA'
+dvcNeurons_glut2 <- ScaleData(dvcNeurons_glut2,feature=rownames(dvcNeurons_glut2),verbose = FALSE)
+```
+
+
+```{r  Glut2 neurons plots }
+markers.IN <- c("Slc6a5", "Gad1","Gad2", "Slc32a1")
+markers.EN <- c("Slc17a6","Chat")
+markers.CA <- c("Th","Ddc","Dbh")
+markers.glucose <- c("Gck","Slc16a1","Slc2a3","Hk1","Kcnk2","Kcnk3","Kcnk9","Kcnj11","Prkaa2","Abcc8","Glp1r","Insr","Mapk3","Mapk1")
+features_full=c(markers.EN, markers.IN,markers.CA,markers.glucose)
+
+# here I just modified a little to test the violin plot, think that sort of produced a quite good result?
+VlnPlot(dvcNeurons_glut2, features=features_full,stack=T,flip=T)+ylab("marker gene expression level")+xlab("Clusters")
+
+# +coord_flip()+labs(title="Neuronal marker gene expression")+theme(plot.title = element_text(face="bold")) +scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), mid = "grey", high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+
+# dotplot is useful to show the neuronal markers.
+
+DotPlot(dvcNeurons_glut2, features=c(markers.EN,markers.IN,markers.CA))+ scale_x_discrete(
+  "Marker genes",
+labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "VGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1",
+    "Slc2a3"="Glut3",
+    "Kcnj11"="Kir6.2",
+    "Hk1"="Hexokinase1",
+    "Th"="Tyrosine Hydroxylase"
+    
+  ))+ylab("Clusters")+coord_flip()+labs(title="Neuronal marker gene expression")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), mid = "grey", high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+
+DotPlot(dvcNeurons_glut2, features=markers.glucose)+ scale_x_discrete(
+  "Marker genes",
+labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "VGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1",
+    "Slc2a3"="Glut3",
+    "Kcnj11"="Kir6.2",
+    "Hk1"="Hexokinase1",
+    "Th"="Tyrosine Hydroxylase"
+    
+  ))+ylab("Clusters")+coord_flip()+labs(title="Glucosensing gene expression")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), mid = "grey", high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+
+
+
+ FeaturePlot(dvcNeurons_glut2,features=features_full)
+
+# glut5 <- ScaleData(glut5,features=c(features_full,"Slc2a2"))
+DoHeatmap(dvcNeurons_glut2, features = features_full, size = 3)+scale_y_discrete(
+  "Marker genes",
+labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "VGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1",
+    "Slc2a3"="Glut3",
+    "Kcnj11"="Kir6.2",
+    "Hk1"="Hexokinase1",
+    "Th"="Tyrosine Hydroxylase"
+    
+  ))+ylab("Clusters")+labs(title="Gene expression of Glut2+ Neurons")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+
+# poor average expression of glucokinase across clusters
+```
+
+```{r heatmaps }
+# heatmap 1, single cell expression 
+DoHeatmap(dvcNeurons_glut2, features = features_full, size = 3)+scale_y_discrete(
+  "Marker genes",
+labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "VGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1",
+    "Slc2a3"="Glut3",
+    "Kcnj11"="Kir6.2",
+    "Hk1"="Hexokinase1",
+    "Th"="Tyrosine Hydroxylase"
+    
+  ))+ylab("Clusters")+labs(title="Gene expression of Glut2+ Neurons")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+
+# heatmap 2, average expression 
+cluster.averages.glut2 <- AverageExpression(dvcNeurons_glut2, features=features_full,return.seurat = T,assays="RNA")
+
+DoHeatmap(cluster.averages.glut2, features = features_full, size = 3, draw.lines = FALSE)+scale_y_discrete(
+  "Marker genes",
+labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "VGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1",
+    "Slc2a3"="Glut3",
+    "Kcnj11"="Kir6.2",
+    "Hk1"="Hexokinase1",
+    "Th"="Tyrosine Hydroxylase"
+    
+  ))+ylab("Clusters")+labs(title="Gene expression of Glut2+ Neurons")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+AverageExpression(dvcNeurons_glut2,"Gck",assays="RNA")
+
+
+```
+
+```{r  Glut2 neurons averageexpression }
+# AverageExpression(dvcNeurons_glut2,feature=c("Gck","Hk1"),assays="RNA") %>% kbl(caption = "Average expression of Gck and Hk1 among Glut2+ neuron clusters") %>%
+#   kable_classic(full_width = T, html_font = "Times New Roman")
+# 
+# AverageExpression(dvcNeurons_glut2,feature=c("Gck","Hk1"),assays="RNA",group.by="cell.type") %>% kbl(caption = "Average expression of Gck and Hk1 among Glut2+ neurons") %>%
+#   kable_classic(full_width = T, html_font = "Times New Roman")
+# 
+# nonglut2neuron <- subset(dvcNeurons,Slc2a2==0, slot="counts")
+# 
+# 
+# AverageExpression(nonglut2neuron,feature=c("Gck","Hk1"),assays="RNA") %>% kbl(caption = "Average expression of Gck and Hk1 among Glut2-negative neuron clusters") %>%
+#   kable_classic(full_width = T, html_font = "Times New Roman")
+# rm(nonglut2neuron)
+# 
+AverageExpression(dvcNeurons_glut2,features = "Abcc8",group.by="ident", assays = 'RNA') %>% kbl(caption = "Average expression of Gck and Hk1 among DVC neurons") %>%
+  kable_classic(full_width = T, html_font = "Times New Roman")
+
+# lut2,features=features_full,assays = "RNA")
+
+(marker <- FindAllMarkers(dvcNeurons_glut2) %>% group_by(cluster)%>%
+    group_by(cluster) %>%
+    slice_max(n = 10, order_by = avg_log2FC))
+# mean(x = expm1(x = x))
+```
+```{r}
+DefaultAssay(dvcNeurons_glut2) <- "integrated"
+markers <-FindAllMarkers(dvcNeurons_glut2, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25) %>%
+  group_by(cluster) %>%
+  slice_max(order_by = 1/p_val_adj, n=12)
+markers
+```
+
+
+
+```{r gene table}
+featureCount <- GetAssayData(dvcNeurons_glut2,slot="counts")[features_full,]
+featureCount <- data.frame(t(featureCount))
+genes <- rownames(featureCount)
+featureCount <- tibble(featureCount)
+featureCount <- mutate(featureCount,genenames=genes)
+neuron_idents <- tibble(clusters=Idents(dvcNeurons_glut2))
+neuron_idents <- mutate(neuron_idents,genenames=genes)
+genetable_neuron <- left_join(featureCount,neuron_idents,by="genenames")
+
+genetable_neuron %>% 
+  group_by(clusters)%>%
+  summarise(
+    n=n(),
+    Glucokinase=sum(Gck!=0),
+    Hexokinase = sum(Hk1!=0),
+    AMPK = sum(Prkaa2!=0),
+    
+    )  %>%  kbl(caption = "Gene expression in Glut2+ neuron clusters") %>%
+  kable_classic(full_width = T, html_font = "Times New Roman")
+
+```
+
+```{r}
+saveRDS(dvcNeurons_glut2, "DVC_glut2_neuron.rds")
+```
+
+```{r}
+
+FeaturePlot(dvcNeurons_glut2,c("Ptgs2os"),label=T)
+table(subset(dvcNeurons_glut2, ident=1)[["neuronal.subtype"]])
+```
+
+```{r cluster 4 analysis }
+cluster4 <- subset(dvcNeurons_glut2,idents=4)
+FeaturePlot(cluster4,"Pnpla1")
+AverageExpression(cluster4,"Pnpla1",assay="RNA")
+```
+```{r}
+npy1 <- tibble(subset(dvcNeurons_glut2, Npy>0)[["neuronal.subtype"]],Idents(subset(dvcNeurons_glut2, Npy>0)))
+npy
+npy %>% 
+  group_by(Idents) %>%
+  filter(integrated_snn_res.0.3 %in% c(0,3))%>%
+  count(neuronal.subtype)
+```
+
+
+
+```{r}
+FeaturePlot(dvcNeurons_glut2,"Hk1")
+
+```
+
+```{r}
+cluster1 <- subset(dvcNeurons_glut2,idents=1)
+DefaultAssay(cluster1) <- "integrated"
+cluster1<- ScaleData(cluster1)
+cluster1 <- RunPCA(cluster1, verbose = FALSE)
+# ElbowPlot(dvcNeurons_glut3)
+cluster1<-FindNeighbors(object = cluster1, reduction = "pca",dims=1:30)
+cluster1<-FindClusters(cluster1,resolution = 1 ,verbose=F)
+cluster1 <- RunUMAP(cluster1, reduction = "pca", dims = 1:30,verbose=F)
+DimPlot(cluster1) 
+
+DefaultAssay(cluster1) <- "RNA"
+DoHeatmap(subset(dvcNeurons_glut2,idents=4), features = features_full, size = 3)+scale_y_discrete(
+  "Marker genes",
+labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "VGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1",
+    "Slc2a3"="Glut3",
+    "Kcnj11"="Kir6.2",
+    "Hk1"="Hexokinase1",
+    "Th"="Tyrosine Hydroxylase"
+    
+  ))+ylab("Clusters")+labs(title="Gene expression of Glut2+ Neurons")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+DoHeatmap(cluster1, features = features_full, size = 3)+scale_y_discrete(
+  "Marker genes",
+labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "VGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1",
+    "Slc2a3"="Glut3",
+    "Kcnj11"="Kir6.2",
+    "Hk1"="Hexokinase1",
+    "Th"="Tyrosine Hydroxylase"
+    
+  ))+ylab("Clusters")+labs(title="Gene expression of Glut2+ Neurons")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+
+
+```
+

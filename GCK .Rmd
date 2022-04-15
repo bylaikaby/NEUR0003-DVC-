@@ -1,0 +1,240 @@
+---
+title: "Gck"
+output: html_notebook
+---
+
+Analysis focused on Gck cell in the tunepers dataset.
+
+1289 out of 1368 cells are neurons, considerably more than Glut2 neurons (249). 
+Gck mRNA expression has been reported to be extremely low, however, 
+
+
+Comparing to Glut2, GCK neurons 
+
+
+```{r global settings}
+knitr::opts_chunk$set(message = FALSE,echo=FALSE,warning=FALSE)
+```
+
+```{r Gck overview}
+
+dvcGck <- read_rds("dvcGck.rds")
+table(Idents(dvcGck))
+rm()
+
+gckCount<- GetAssayData(newDVC,slot="counts")["Gck",]
+newDVC$gckCount <- gckCount
+VlnPlot(newDVC, feature ="Gck",flip=T, sort=T)+labs(title="Gck expression")
+knitr::kable(table(as.character(Idents(newDVC)),c(gckCount)))
+gckPos <- ifelse(GetAssayData(newDVC,slot="counts")["Gck",]>=1,"T","F")
+newDVC$gckPos <- gckPos
+
+
+# total percentage
+sum(gckCount>=1)/dim(newDVC[[]])[1]*100
+
+# individual percentage
+gcktable = tibble(Gck=gckCount,cell.type=as.character(Idents(newDVC)))
+gckPercentage <- gcktable %>% 
+  mutate(gckPos = ifelse(Gck>0,1,0)) %>%
+  group_by(cell.type) %>%
+  summarise(Gck_Positive_Cells=sum(gckPos),Gck_percentage=round(Gck_Positive_Cells/n()*100,3),Total_Cell_Count=n()) %>% arrange(desc(Gck_percentage))
+
+
+
+
+ggplot(gckPercentage,mapping=aes(x=reorder(cell.type,-Gck_percentage),y=Gck_percentage,fill=cell.type))+
+  geom_bar(stat="identity")+geom_text(aes(label = Gck_percentage, vjust = 0),check_overlap=T)+ scale_x_discrete(guide = guide_axis(n.dodge=3))+xlab("Cell Types")+labs(title="Percentage of Gck+ cells per cell type")+theme(plot.title = element_text(face="bold"))+NoLegend()
+knitr::kable(gckPercentage)
+
+
+
+```
+
+
+
+```{r GCK neurons, eval=FALSE, include=FALSE, }
+DefaultAssay(newDVC) <- "RNA"
+dvcGck <- subset(newDVC,Gck>0,slot="counts")
+dvcGck <- subset(dvcGck,ident="Neurons")
+DefaultAssay(dvcGck) <- 'integrated'
+dvcGck<- ScaleData(dvcGck, feature=rownames(dvcGck),verbose = FALSE)
+dvcGck <- RunPCA(dvcGck, verbose = FALSE)
+# ElbowPlot(dvcNeurons_glut3)
+dvcGck<-FindNeighbors(object = dvcGck, reduction = "pca",dims=1:30)
+dvcGck<-FindClusters(dvcGck,resolution = 0.3 ,verbose=F)
+dvcGck <- RunUMAP(dvcGck, reduction = "pca", dims = 1:30,verbose=F)
+saveRDS(dvcGck, "dvcGck.rds")
+
+# gckmarker <- FindAllMarkers(dvcGck)
+# (gckmarker %>%
+#     group_by(cluster) %>%
+#     slice_max(n = 20, order_by = avg_log2FC))
+# gckmarker %>% 
+#   group_by(cluster)%>%
+#   filter(gene %in% features_full)
+```
+
+
+```{r GCK neurons plots}
+DimPlot(dvcGck,label=T,repel=T)+ggmin::theme_powerpoint()+NoLegend()+labs(title="Gck+ Neuron Clusters, total n=1288")+theme(plot.title = element_text(face="bold"))
+DefaultAssay(dvcGck) <- 'RNA'
+dvcGck <- ScaleData(dvcGck, verbose = FALSE)
+
+markers.IN <- c("Slc6a5", "Gad1","Gad2", "Slc32a1")
+markers.EN <- c("Slc17a6","Chat")
+markers.CA <- c("Th","Ddc","Dbh","Npy")
+markers.glucose <- c("Gck","Slc16a1","Slc2a3","Hk1","Kcnk2","Kcnk3","Kcnk9","Kcnj11","Prkaa2","Abcc8","Glp1r","Insr","Mapk3","Mapk1")
+features_full=c(markers.EN, markers.IN,markers.CA,markers.glucose)
+
+
+dot1 <- DotPlot(dvcGck, features=markers.glucose)+ scale_x_discrete(
+  "Glucosensing Marker genes",
+  labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "vGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Slc2a3"="Glut3",
+    "Slc2a2"="Glut2",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1"
+  ))+ylab("Clusters")+coord_flip()
+
+
+# theme(axis.text.x = element_text(angle = 45, size=5, hjust = 1))
+
+dot2 <- DotPlot(dvcGck, features=c (markers.IN,markers.EN,markers.CA))+ scale_x_discrete(
+  "Neuronal Marker genes",
+  labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "vGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Slc2a3"="Glut3",
+    "Slc2a2"="Glut2",
+    "Kcnk2"="Trek-1"
+  ))+ylab("Clusters")+coord_flip()
+
+
+dot2
+
+(dot1 +NoLegend()+dot2)
+
+
+DoHeatmap(dvcGck, features = c (features_full[!features_full %in% "Gck"],"Slc2a2"), size = 3)+scale_y_discrete(
+  "Marker genes",
+labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "vGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1",
+    "Slc2a2"="Glut2",
+    "Slc2a3"="Glut3",
+    "Kcnj11"="Kir6.2",
+    "Hk1"="Hexokinase1",
+    "Th"="Tyrosine Hydroxylase"
+    
+    
+  ))+ylab("Clusters")+labs(title="Gene expression of Gck+ Neurons")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), mid = "grey", high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+
+
+```
+
+
+```{r heatmaps}
+
+# square heatmap
+cluster.averages.gck <- AverageExpression(dvcGck, features=c (features_full[!features_full %in% "Gck"],"Slc2a2"),return.seurat = T,assays="RNA")
+
+DoHeatmap(cluster.averages.gck, features = c (features_full[!features_full %in% "Gck"],"Slc2a2"), size = 3, draw.lines = FALSE)+scale_y_discrete(
+  "Marker genes",
+labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "vGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1",
+    "Slc2a3"="Glut3",
+    "Kcnj11"="Kir6.2",
+    "Hk1"="Hexokinase1",
+    "Th"="Tyrosine Hydroxylase",
+    "Slc2a2"="Glut2"
+    
+  ))+ylab("Clusters")+labs(title="Gene expression of Gck+ Neurons")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+
+
+# line heatmap
+DoHeatmap(dvcGck, features = c (features_full[!features_full %in% "Gck"],"Slc2a2"), size = 3)+scale_y_discrete(
+  "Marker genes",
+labels = c(
+    "Slc17a6" = "VGlut2",
+    "Slc6a5" = "GlyT2",
+    "Slc32a1" = "vGAT",
+    "Abcc8"="Sur1",
+    "Kcnk3"="Task1",
+    "Kcnk9"="Task3",
+    "Kcnk2"="Trek-1",
+    "Prkaa2"="AMPK",
+    "Slc16a1"="Mct-1",
+    "Slc2a2"="Glut2",
+    "Slc2a3"="Glut3",
+    "Kcnj11"="Kir6.2",
+    "Hk1"="Hexokinase1",
+    "Th"="Tyrosine Hydroxylase"
+    
+    
+  ))+ylab("Clusters")+labs(title="Gene expression of Gck+ Neurons")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+```
+```{r violin plot}
+
+VlnPlot(dvcGck, features = c (features_full[!features_full %in% c("Gck","Kcnj11")],"Slc2a2"), stack=T,flip=T)
+
+```
+
+
+```{r GCK neurons average expression}
+VlnPlot(dvcNeurons,"Gck",assay="RNA")
+
+
+
+
+table(subset(dvcGck, ident=5)[["neuronal.subtype"]])
+```
+```{r comparing the overlap between two cholinergic clusters}
+
+gck.cluster4 <- WhichCells(dvcGck,idents=4)
+glut2.cluster3 <- WhichCells(dvcNeurons_glut2,idents=3)
+
+glut2.cluster3 == gck.cluster4
+
+intersect(glut2.cluster3,gck.cluster4)
+
+```
+```{r}
+npy <- tibble(subset(dvcGck, Npy>1)[["neuronal.subtype"]],cluster =Idents(subset(dvcGck, Npy>1)))
+npy %>% 
+  group_by(cluster) %>%
+  filter(cluster %in% c(1,6))%>%
+  count(neuronal.subtype)
+
+```
+
+```{r}
+FeaturePlot(dvcGck,"Slc2a2")+
+```
+
