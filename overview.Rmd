@@ -498,7 +498,6 @@ FeaturePlot(dvcAstrocytes,c("Gck","Slc2a2"),blend=T)+NoLegend()
 
 ### Auxillary tests for certain genes
 
-we 
 
 ```{r gene significance testting }
 DefaultAssay(dvcNeurons_glut2) <- "RNA"
