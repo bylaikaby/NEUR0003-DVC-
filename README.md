@@ -1,6 +1,6 @@
 # NEUR0003-DVC-YAN
 
-##Dorsal vagal complex glucosensing neurons
+## Dorsal vagal complex glucosensing neurons
 
 Contains code information for the snRNA-seq analysis on the DVC dataset acquired from Ludwig et al.,(2021).
 
