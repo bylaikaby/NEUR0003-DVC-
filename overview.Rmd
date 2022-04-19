@@ -352,7 +352,7 @@ FeaturePlot(dvcNeurons_glut2,"Hk1")+labs(title="Glut2+ cells co-expressing Hk1,n
 gck_glut2 <-unlist(AverageExpression (dvcNeurons_glut2,feature=c("Gck"),assays="RNA"))
 gck_nonglut2 <- unlist(AverageExpression(nonglut2neuron,feature=c("Gck"),assays="RNA"))
 
-# boxplot(gck_glut2, gck_nonglut2)
+boxplot(gck_glut2, gck_nonglut2)
 
 FeaturePlot(dvcNeurons_glut2,"Gck",slot="count")+labs(title="Glut2+ cells co-expressing Gck, n=10")+theme(plot.title = element_text(face="bold"))+NoLegend()
 
@@ -506,7 +506,9 @@ DefaultAssay(dvcNeurons_glut2) <- "RNA"
 # FindConservedMarkers(dvcNeurons_glut2, ident.1=0,ident.2=1)
 FindAllMarkers(dvcNeurons_glut2,features=features_full)
 
+DefaultAssay(dvcGck) <- "RNA"
 FindAllMarkers(dvcGck,features=features_full)
+
 
 FindAllMarkers (dvcGck,"Glp1r")
 

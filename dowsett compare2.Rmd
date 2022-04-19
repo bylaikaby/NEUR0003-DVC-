@@ -1,0 +1,256 @@
+---
+title: "Untitled"
+output: html_document
+---
+```{r global settings}
+knitr::opts_chunk$set(message = FALSE,echo=FALSE,warning=FALSE)
+```
+
+```{r load libraries and dataset}
+library(Seurat)
+library(dplyr)
+# conversion from ENSEMBL to gene names requires a AnnotationDbi dataset
+library(org.Mm.eg.db)
+library(sctransform)
+library(ggplot2)
+library(ggfittext)
+library(tidyverse)
+library(kableExtra)
+library(patchwork)
+
+```
+
+
+```{r Dowsett part1, preprocessing and integration }
+
+# ntsap <- read_rds("ntsap.RDS")
+# DefaultAssay(ntsap) <- "integrated"
+# ntsap <- ScaleData(object = ntsap)
+# ntsap <- RunPCA(object = ntsap)
+# ntsap <- FindNeighbors(object = ntsap)
+# ntsap <- FindClusters(object = ntsap,resolution = 0.5)
+# ntsap <- RunUMAP(object = ntsap,dims=1:15)
+# DimPlot(ntsap)
+
+
+# ntsap <- read_rds("/Users/b_yan/Downloads/NEUR0003 my Project/Tune Pers_dataset_Binbin221121/ntsap.RDS")
+# 
+ntsap <- read_rds("/Users/b_yan/Downloads/NEUR0003 my Project/Tune Pers_dataset_Binbin221121/NEUR0003/nts_merged.master.201023.RDS")
+
+
+
+# 
+# ntsap.list<- SplitObject(ntsap,split.by = "nutr.cond")
+# 
+# 
+# 
+# 
+# 
+# ntsap.list <- lapply(X=ntsap.list,function(x){
+#   x <- NormalizeData(x)
+#   x <- FindVariableFeatures(x)
+# })
+# 
+# features <- SelectIntegrationFeatures(ntsap.list)
+# 
+# anchors <- FindIntegrationAnchors(object.list=ntsap.list,anchor.features = features)
+# 
+# 
+# ntsap <- IntegrateData(anchorset=anchors)
+```
+
+
+```{r Dowsett part1 }
+# a function for symbol to ENSEMBOL conversion ----
+namegene <- function(genelist){
+  return(geneNames = mapIds(org.Mm.eg.db,keys= genelist
+                            , keytype="SYMBOL", columkns= "ENSEMBL",column="ENSEMBL"))
+}
+
+DefaultAssay(ntsap) <- "RNA"
+
+# markers.celltype <- c("Ntsr2", "Slc38a5", "Ccdc153", "C1qa", "Mag", "Cspg4", "Wt1", "Lum")
+# VlnPlot(ntsap, features=neamg(markers.celltype), stack=T,flip=T)+xlab("Clusters")
+
+# in the next few steps follow core workflow in tunepers's paper ----
+
+# a similar pattern is observed, but comparing to complete DVC data which included also DMNX, 
+FeaturePlot (ntsap,feature=namegene("Slc2a2"),cols=c("grey","red"),label=T)+labs(title="Slc2a2 - Glut2 expression")
+
+
+glut2Count<- GetAssayData(ntsap,slot="counts")[namegene("Slc2a2"),]
+ntsap$glut2Count <- glut2Count
+# VlnPlot(ntsap, feature =namegene("Slc2a2"),flip=T,sort=T)+labs(title="Glut2 expression")
+# table(as.character(Idents(ntsap)),glut2Count)
+
+
+glut2Pos <- ifelse(GetAssayData(ntsap,slot="counts")[namegene("Slc2a2"),]>=1,"T","F")
+ntsap$glut2Pos <- glut2Pos                   
+
+# total percentage
+sum(glut2Count>1)/dim(ntsap[[]])[1]*100
+
+# individual percentage
+glut2table = tibble(Glut2=glut2Count,cell.type=as.character(Idents(ntsap)))
+glut2Percentage <- glut2table %>% 
+  mutate(glut2Pos = ifelse(Glut2>0,1,0)) %>%
+  group_by(cell.type) %>%
+  summarise(Glut2_Positive_Cells=sum(glut2Pos),Glut2_percentage=round(Glut2_Positive_Cells/n()*100,3),Total_Cell_Count=n())
+
+
+ggplot(glut2Percentage,mapping=aes(x=reorder(cell.type,-Glut2_percentage),y=Glut2_percentage,fill=cell.type))+
+  geom_bar(stat="identity")+geom_text(aes(label = Glut2_percentage, vjust = 0),check_overlap=T)+labs(title="Percentage of Glut2+ cells per cell type",x="Cell Types")+theme(plot.title = element_text(face="bold"))+NoLegend()
+
+knitr::kable(glut2Percentage)
+```
+
+
+```{r Dowsett part2 }
+ntsap_neurons<-subset(ntsap,idents=c(25,12,27,26,16,30,33,17,11,7,5,6,18,23,39,21,36,34,40,13,2,19,29,14,22,20,38,31,35,28))
+
+rm(ntsap)
+
+ntsap_neurons <- ScaleData(ntsap_neurons, verbose = FALSE)
+ntsap_neurons <- FindVariableFeatures(object = ntsap_neurons)
+
+ntsap_neurons <- RunPCA(ntsap_neurons, verbose = FALSE)
+# ElbowPlot(ntsap_neurons)
+ntsap_neurons<-FindNeighbors(object = ntsap_neurons, reduction = "pca",dims=1:30)
+ntsap_neurons<-FindClusters(ntsap_neurons,resolution = 0.3,verbose=F)
+ntsap_neurons <- RunUMAP(ntsap_neurons, reduction = "pca", dims = 1:30,verbose=F)
+DimPlot(ntsap_neurons,label=T)
+
+features_full3=c("Slc2a2","Gck","Abcc8","Kcnk3","Kcnk9","Prkaa2")
+
+(en_features=namegene(features_full3))
+
+DotPlot(ntsap_neurons, features=namegene(features_full3))+ scale_x_discrete(
+  "Marker genes",
+  labels = c(
+    "ENSMUSG00000027690"="Glut2",
+    "ENSMUSG00000041798"="Gck",
+    "ENSMUSG00000040136"="Sur1",
+    "ENSMUSG00000049265"="Task1",
+    "ENSMUSG00000036760"="Task3",
+    "ENSMUSG00000028518"="AMPK"
+    
+  ))+ylab("Clusters") 
+
+FeaturePlot(ntsap_neurons,features=namegene(features_full3))
+DefaultAssay(ntsap_neurons) <- "RNA"
+ntsap_neurons<- ScaleData(ntsap_neurons,features=rownames(ntsap_neurons), verbose = FALSE)
+
+DoHeatmap(ntsap_neurons, features = namegene(features_full3), size = 3)+scale_y_discrete(
+  "Marker genes",
+  labels = c(
+    "ENSMUSG00000027690"="Glut2",
+    "ENSMUSG00000041798"="Gck",
+    "ENSMUSG00000040136"="Sur1",
+    "ENSMUSG00000049265"="Task1",
+    "ENSMUSG00000036760"="Task3",
+    "ENSMUSG00000028518"="AMPK"
+    
+  ))
+# used scaled data for individual cell
+
+AverageExpression(ntsap_neurons,features=features_full2,assays = "RNA")
+```
+```{r cluster 3 ntsap neuron}
+
+cluster3 <- subset(ntsap_neurons,ident=3)
+FeaturePlot(cluster3,namegene("Gck"))
+FindConservedMarkers(cluster3)
+
+```
+
+
+```{r Dowsett part3, glut2 neurons }
+ntsap.glut2 <- subset(ntsap_neurons, ENSMUSG00000027690>0,slot="counts")
+ntsap.glut2 <- FindVariableFeatures(object = ntsap.glut2)
+
+ntsap.glut2 <- ScaleData(ntsap.glut2,features=rownames(ntsap.glut2 ), verbose = FALSE)
+ntsap.glut2 <- RunPCA(ntsap.glut2, verbose = FALSE)
+ElbowPlot(ntsap.glut2)
+ntsap.glut2<-FindNeighbors(ntsap.glut2)
+ntsap.glut2<-FindClusters(ntsap.glut2,resolution = 1,verbose=F)
+ntsap.glut2 <- RunUMAP(ntsap.glut2, dims = 1:20,verbose=F)
+
+markers.IN <- c("Slc6a5", "Gad1","Gad2", "Slc32a1")
+markers.EN <- c("Slc17a6","Chat")
+markers.CA <- c("Th","Ddc","Dbh","Npy")
+markers.glucose <- c("Gck","Slc2a3","Hk1","Kcnk2","Kcnk3","Kcnk9","Kcnj8","Kcnj11","Prkaa2","Abcc8","Gcg","Glp1r","Insr")
+markers.astro <- c("Slc16a1","Slc16a7","P2rx3","P2rx4","P2rx5")
+
+features_full=c(markers.EN, markers.IN,markers.CA,markers.glucose,markers.astro)
+
+
+DimPlot(ntsap.glut2,label=T)
+DotPlot(ntsap.glut2, features=namegene(features_full3))+ scale_x_discrete(
+  "Marker genes",
+  labels = c(
+    "ENSMUSG00000027690"="Glut2",
+    "ENSMUSG00000041798"="Gck",
+    "ENSMUSG00000040136"="Sur1",
+    "ENSMUSG00000049265"="Task1",
+    "ENSMUSG00000036760"="Task3",
+    "ENSMUSG00000028518"="AMPK"
+    
+  ))+ylab("Clusters") 
+ntsap.glut2 <- ScaleData(ntsap.glut2, features = rownames(ntsap.glut2))
+
+names(features_full) <- namegene(features_full)
+# heatmap1
+DoHeatmap(ntsap.glut2, features = namegene(features_full), size = 3)+scale_y_discrete(
+   "Marker genes", labels=features_full)
+# heatmap2
+cluster.averages.glut2 <- AverageExpression(ntsap.glut2, features=namegene(features_full),return.seurat = T,assays="RNA")
+
+DoHeatmap(cluster.averages.glut2,features=namegene(features_full),size = 3, draw.lines = FALSE)+scale_y_discrete(
+  "Marker genes",
+labels = features_full)+ylab("Clusters")+labs(title="Gene expression of Glut2+ Neurons")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+
+
+
+```
+
+
+```{r Dowsett Gck neurons}
+ntsap.gck <- subset(ntsap_neurons, ENSMUSG00000041798>0,slot="counts")
+ntsap.gck <- FindVariableFeatures(object = ntsap.gck)
+
+ntsap.gck <- ScaleData(ntsap.gck,features=rownames(ntsap.gck ), verbose = FALSE)
+ntsap.gck <- RunPCA(ntsap.gck, verbose = FALSE)
+ElbowPlot(ntsap.gck)
+ntsap.gck<-FindNeighbors(ntsap.gck)
+ntsap.gck<-FindClusters(ntsap.gck,resolution = 1,verbose=F)
+ntsap.gck <- RunUMAP(ntsap.gck, dims = 1:20,verbose=F)
+
+
+DimPlot(ntsap.gck,label=T)
+DotPlot(ntsap.gck, features=namegene(features_full3))+ scale_x_discrete(
+  "Marker genes",
+  labels = c(
+    "ENSMUSG00000027690"="Glut2",
+    "ENSMUSG00000041798"="Gck",
+    "ENSMUSG00000040136"="Sur1",
+    "ENSMUSG00000049265"="Task1",
+    "ENSMUSG00000036760"="Task3",
+    "ENSMUSG00000028518"="AMPK"
+    
+  ))+ylab("Clusters") 
+ntsap.gck <- ScaleData(ntsap.gck, features = rownames(ntsap.gck))
+
+names(features_full) <- namegene(features_full)
+# heatmap1
+DoHeatmap(ntsap.gck, features = namegene(features_full), size = 3)+scale_y_discrete(
+   "Marker genes", labels=features_full)
+# heatmap2
+cluster.averages.glut2 <- AverageExpression(ntsap.gck, features=namegene(features_full),return.seurat = T,assays="RNA")
+
+DoHeatmap(cluster.averages.glut2,features=namegene(features_full),size = 3, draw.lines = FALSE)+scale_y_discrete(
+  "Marker genes",
+labels = features_full)+ylab("Clusters")+labs(title="Gene expression of Glut2+ Neurons")+theme(plot.title = element_text(face="bold"))+scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
+
+
+```
+
